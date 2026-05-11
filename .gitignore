@@ -11,3 +11,4 @@ Thumbs.db
 __启动脚本.bat
 *.txt
 !requirements.txt
+web_script/
