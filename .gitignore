@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+downloads/
+config.json
+*.pyc
+*.pyo
+aria2.zip
+aria2c.exe
+.DS_Store
+Thumbs.db
+__启动脚本.bat
+*.txt
+!requirements.txt
