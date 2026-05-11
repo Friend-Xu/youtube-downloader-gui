@@ -545,16 +545,23 @@ class App(tk.Tk):
 
         # 封面
         self.cover_label = ttk.Label(frame, text="暂无封面", relief="sunken", anchor="center", width=16)
-        self.cover_label.grid(row=0, column=0, rowspan=4, padx=(0, 8), sticky="ns")
+        self.cover_label.grid(row=0, column=0, rowspan=6, padx=(0, 8), sticky="ns")
 
         self.lbl_title = ttk.Label(frame, text="标题: —", wraplength=500)
         self.lbl_title.grid(row=0, column=1, sticky="w")
-        self.lbl_uploader = ttk.Label(frame, text="上传者: —")
+        self.lbl_uploader = ttk.Label(frame, text="作者: —")
         self.lbl_uploader.grid(row=1, column=1, sticky="w")
         self.lbl_duration = ttk.Label(frame, text="时长: —")
         self.lbl_duration.grid(row=2, column=1, sticky="w")
         self.lbl_count = ttk.Label(frame, text="可用格式: —")
         self.lbl_count.grid(row=3, column=1, sticky="w")
+
+        self.lbl_url = ttk.Label(frame, text="链接: —", wraplength=500, foreground="blue", cursor="hand2")
+        self.lbl_url.grid(row=4, column=1, sticky="w")
+        self.lbl_url.bind("<Button-1>", lambda e: self._copy_video_url())
+
+        self.lbl_desc = ttk.Label(frame, text="简介: —", wraplength=500, foreground="gray")
+        self.lbl_desc.grid(row=5, column=1, sticky="w")
 
     def _build_format_filter(self):
         frame = ttk.Frame(self)
@@ -583,8 +590,10 @@ class App(tk.Tk):
         frame.grid(row=5, column=0, sticky="ew", padx=8, pady=(0, 0))
 
         ttk.Checkbutton(frame, text="同时下载视频封面", variable=self.cover_var).pack(side="left", padx=4)
-        self.btn_cover = ttk.Button(frame, text="下载封面", command=self._download_cover_only, state="disabled")
+        self.btn_cover = ttk.Button(frame, text="导出信息", command=self._export_info, state="disabled")
         self.btn_cover.pack(side="left", padx=4)
+        self.btn_dl_cover = ttk.Button(frame, text="下载封面", command=self._download_cover_only, state="disabled")
+        self.btn_dl_cover.pack(side="left", padx=2)
 
         ttk.Label(frame, text="下载线程:").pack(side="left", padx=(12, 2))
         ttk.Label(frame, text="视频").pack(side="left")
@@ -774,9 +783,12 @@ class App(tk.Tk):
         # 更新信息面板
         title = info.get("title", "—")
         self.lbl_title.config(text=f"标题: {title}")
-        self.lbl_uploader.config(text=f"上传者: {info.get('uploader', '—')}")
+        self.lbl_uploader.config(text=f"作者: {info.get('uploader', '—')}")
         self.lbl_duration.config(text=f"时长: {format_duration(info.get('duration'))}")
         self.lbl_count.config(text=f"可用格式: {len(self.formats)} 个")
+        self.lbl_url.config(text=f"链接: {info.get('webpage_url') or self.url_var.get()}")
+        desc = (info.get("description") or "—")[:200]
+        self.lbl_desc.config(text=f"简介: {desc}")
 
         # 缩略图
         thumb_url = info.get("thumbnail")
@@ -801,6 +813,7 @@ class App(tk.Tk):
         self.status_var.set(f"分析完成 — {len(self.formats)} 个可用格式")
         self.btn_download.config(state="normal")
         self.btn_cover.config(state="normal")
+        self.btn_dl_cover.config(state="normal")
 
     def _load_thumbnail(self, url):
         data = fetch_thumbnail_data(url, proxy=self.proxy_var.get().strip() or None)
@@ -870,6 +883,38 @@ class App(tk.Tk):
         )
         self.dl_thread.title = self.info.get("title", "cover")
         self.dl_thread.start()
+
+    def _copy_video_url(self):
+        url = self.info.get("webpage_url") or self.url_var.get()
+        if url:
+            self.clipboard_clear()
+            self.clipboard_append(url)
+            self.status_var.set("链接已复制到剪贴板")
+
+    def _export_info(self):
+        if not self.info:
+            return
+        title = self.info.get("title", "video")
+        name = safe_filename(title)[:60]
+        f = filedialog.asksaveasfilename(
+            initialfile=f"{name}.txt",
+            initialdir=self.save_path.get(),
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+        )
+        if not f:
+            return
+        try:
+            with open(f, "w", encoding="utf-8") as out:
+                out.write(f"标题: {self.info.get('title', '—')}\n")
+                out.write(f"作者: {self.info.get('uploader', '—')}\n")
+                out.write(f"时长: {format_duration(self.info.get('duration'))}\n")
+                out.write(f"链接: {self.info.get('webpage_url') or self.url_var.get()}\n")
+                out.write(f"\n{self.info.get('description', '')}\n")
+            self.status_var.set(f"信息已导出: {f}")
+            messagebox.showinfo("完成", f"视频信息已保存到:\n{f}")
+        except Exception as e:
+            messagebox.showerror("错误", f"导出失败: {e}")
 
     def _download_cover_only(self):
         thumb_url = self.info.get("thumbnail", "")
