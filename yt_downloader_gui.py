@@ -25,16 +25,20 @@ DEFAULT_DOWNLOAD = str(APP_DIR / "downloads")
 
 def find_aria2():
     """检测 aria2c 可执行文件."""
-    # 先查项目目录
     local = APP_DIR / "aria2c.exe"
     if local.exists():
         return str(local)
-    # 再查 PATH
     import shutil
     found = shutil.which("aria2c")
     if found:
         return found
     return None
+
+
+def find_node():
+    """检测 Node.js 可执行文件（yt-dlp 需要它解决 JS 挑战）."""
+    import shutil
+    return shutil.which("node")
 
 
 def load_config():
@@ -123,6 +127,8 @@ def translate_error(msg):
         return "视频不可用。可能是私享/地区限制/已删除。"
     if "Private video" in msg:
         return "私享视频，需要登录有权限的账号。"
+    if "challenge" in msg.lower() and "fail" in msg.lower():
+        return "YouTube JS 挑战未通过。请确保已安装 Node.js 并重启程序。"
     if "tuple" in msg.lower() and "int" in msg.lower():
         return "yt-dlp 内部格式比较错误。请尝试换一个格式下载（如 mp4 视频+音频格式），或重启程序后重试。"
     return msg
@@ -301,6 +307,9 @@ class DownloadThread(threading.Thread):
             opts["proxy"] = self.proxy
         if self.cookie_opts:
             opts.update(self.cookie_opts)
+        node = find_node()
+        if node:
+            opts["js_runtimes"] = {"node": {"path": node}}
 
         if aria2:
             opts["downloader"] = "aria2c"
@@ -726,6 +735,7 @@ class App(tk.Tk):
 
     def _do_analyze(self, url):
         try:
+            node = find_node()
             opts = {
                 "quiet": True,
                 "no_warnings": True,
@@ -739,6 +749,9 @@ class App(tk.Tk):
                 },
                 "sleep_interval": (1, 3),
             }
+            if node:
+                opts["js_runtimes"] = {"node": {"path": node}}
+                opts["remote_components"] = ["ejs:github"]
             proxy = self.proxy_var.get().strip()
             if proxy:
                 opts["proxy"] = proxy
